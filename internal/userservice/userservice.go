@@ -71,6 +71,9 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*models.User,
 // Login validates credentials and returns the user plus a signed JWT.
 func (s *Service) Login(ctx context.Context, in LoginInput) (*models.User, string, error) {
 	email := strings.ToLower(strings.TrimSpace(in.Email))
+	if email == "" || strings.TrimSpace(in.Password) == "" {
+		return nil, "", ErrInvalidCredentials
+	}
 	u, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, userrepo.ErrNotFound) {
@@ -84,6 +87,9 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*models.User, strin
 	token, err := s.auth.Issue(u.ID, u.Email)
 	if err != nil {
 		return nil, "", err
+	}
+	if strings.TrimSpace(token) == "" {
+		return nil, "", ErrInvalidCredentials
 	}
 	return u, token, nil
 }

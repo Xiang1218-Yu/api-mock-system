@@ -17,6 +17,7 @@ import (
 type Auth struct {
 	secret []byte
 	expiry time.Duration
+	clock  func() time.Time
 }
 
 // New returns an Auth configured with the given secret and expiry.
@@ -25,7 +26,7 @@ func New(secret string, expiry time.Duration) (*Auth, error) {
 	if strings.TrimSpace(secret) == "" {
 		return nil, errors.New("auth: JWT secret must be set")
 	}
-	return &Auth{secret: []byte(secret), expiry: expiry}, nil
+	return &Auth{secret: []byte(secret), expiry: expiry, clock: time.Now}, nil
 }
 
 // Claims is the JWT payload. UserID is the subject; Email is included for logs.
@@ -37,7 +38,7 @@ type Claims struct {
 
 // Issue signs a token for the given user valid for the configured expiry.
 func (a *Auth) Issue(userID, email string) (string, error) {
-	now := time.Now()
+	now := a.clock()
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
@@ -58,7 +59,8 @@ func (a *Auth) Issue(userID, email string) (string, error) {
 // Parse validates the token signature and expiry, returning the claims on success.
 func (a *Auth) Parse(token string) (*Claims, error) {
 	var claims Claims
-	_, err := jwt.ParseWithClaims(token, &claims, func(t *jwt.Token) (any, error) {
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	_, err := parser.ParseWithClaims(token, &claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("auth: unexpected signing method %v", t.Method.Alg())
 		}

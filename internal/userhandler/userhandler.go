@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"api-mock-system/internal/httpx"
+	"api-mock-system/internal/middleware"
 	"api-mock-system/internal/userservice"
 
 	"github.com/gin-gonic/gin"
@@ -70,7 +71,7 @@ func (h *Handler) Me(c *gin.Context) {
 
 // userID pulls the authenticated user id from context (set by RequireAuth).
 func userID(c *gin.Context) (string, bool) {
-	v, exists := c.Get("userID")
+	v, exists := c.Get(string(middleware.UserIDKey))
 	if !exists {
 		return "", false
 	}

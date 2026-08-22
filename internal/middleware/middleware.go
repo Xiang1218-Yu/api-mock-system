@@ -90,9 +90,18 @@ func RequireAuth(a *auth.Auth) gin.HandlerFunc {
 			abortAuth(c, "authorization header must be 'Bearer <token>'")
 			return
 		}
-		claims, err := a.Parse(strings.TrimSpace(token))
+		token = strings.TrimSpace(token)
+		if token == "" {
+			abortAuth(c, "authorization header must be 'Bearer <token>'")
+			return
+		}
+		claims, err := a.Parse(token)
 		if err != nil {
 			abortAuth(c, "invalid or expired token")
+			return
+		}
+		if strings.TrimSpace(claims.UserID) == "" {
+			abortAuth(c, "token has no user identity")
 			return
 		}
 		c.Set(string(UserIDKey), claims.UserID)
