@@ -1,8 +1,0 @@
-# Local build artifacts and runtime state.
-bin/
-api_mock.db
-api_mock.db-wal
-api_mock.db-shm
-*.db
-*.db-*
-.DS_Store

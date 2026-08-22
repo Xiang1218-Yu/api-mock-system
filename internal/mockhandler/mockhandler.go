@@ -62,7 +62,7 @@ func (h *Handler) Serve(c *gin.Context) {
 			status = http.StatusBadRequest
 		}
 		httpx.Error(c, status, err.Error())
-		h.recordCall(projectID, "", c.Request.Method, path, status, max1(totalMs))
+		h.recordCall(c.Request.Context(), projectID, "", c.Request.Method, path, status, max1(totalMs))
 		return
 	}
 	for k, v := range resp.Headers {
@@ -71,13 +71,13 @@ func (h *Handler) Serve(c *gin.Context) {
 	c.JSON(resp.StatusCode, resp.Body)
 	// Strip the configured delay so logged duration reflects real cost.
 	delayMs := int(resp.Delay / time.Millisecond)
-	h.recordCall(projectID, resp.APIID, c.Request.Method, path, resp.StatusCode, max1(totalMs-delayMs))
+	h.recordCall(c.Request.Context(), projectID, resp.APIID, c.Request.Method, path, resp.StatusCode, max1(totalMs-delayMs))
 }
 
 // recordCall fires a best-effort call-log write asynchronously. It never
 // blocks the response or propagates errors — call logs are observability, not
 // part of the request contract (mirrors debugservice.go's fire-and-forget).
-func (h *Handler) recordCall(projectID, apiID, method, path string, status, durationMs int) {
+func (h *Handler) recordCall(parent context.Context, projectID, apiID, method, path string, status, durationMs int) {
 	if h.calllog == nil || projectID == "" {
 		return
 	}
@@ -94,7 +94,7 @@ func (h *Handler) recordCall(projectID, apiID, method, path string, status, dura
 		l.APIID = &apiID
 	}
 	go func(l *models.CallLog) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 		defer cancel()
 		_ = h.calllog.Save(ctx, l)
 	}(l)

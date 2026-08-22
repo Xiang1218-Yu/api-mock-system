@@ -78,7 +78,9 @@ func (s *Service) ProjectStats(ctx context.Context, projectID, userID string) (*
 		return nil, err
 	}
 
-	byKind, err := s.calllogs.CountByKind(ctx, projectID)
+	metricsCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	byKind, err := s.calllogs.CountByKind(metricsCtx, projectID)
 	if err != nil {
 		return nil, err
 	}

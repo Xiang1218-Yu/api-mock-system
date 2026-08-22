@@ -64,6 +64,9 @@ type repo struct{ db *gorm.DB }
 func New(db *gorm.DB) Repository { return &repo{db: db} }
 
 func (r *repo) Save(ctx context.Context, l *models.CallLog) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("calllogrepo: save canceled: %w", err)
+	}
 	if err := r.db.WithContext(ctx).Create(l).Error; err != nil {
 		return fmt.Errorf("calllogrepo: save: %w", err)
 	}
@@ -71,6 +74,9 @@ func (r *repo) Save(ctx context.Context, l *models.CallLog) error {
 }
 
 func (r *repo) CountByKind(ctx context.Context, projectID string) (map[string]int64, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("calllogrepo: count canceled: %w", err)
+	}
 	type row struct {
 		Kind  string
 		Count int64
@@ -92,6 +98,9 @@ func (r *repo) CountByKind(ctx context.Context, projectID string) (map[string]in
 }
 
 func (r *repo) DailyCounts(ctx context.Context, projectID string, days int) ([]DailyCount, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("calllogrepo: daily counts canceled: %w", err)
+	}
 	if days <= 0 {
 		days = 7
 	}

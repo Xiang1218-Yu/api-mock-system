@@ -105,17 +105,17 @@ func (h *Handler) Serve(c *gin.Context) {
 	agg, merged, results, err := h.aggr.Execute(c.Request.Context(), projectID, uid, path, inbound)
 	if err != nil {
 		writeErr(c, err)
-		h.recordCall(projectID, "", c.Request.Method, path, statusForAggrErr(err), 0)
+		h.recordCall(c.Request.Context(), projectID, "", c.Request.Method, path, statusForAggrErr(err), 0)
 		return
 	}
 	httpx.OK(c, gin.H{"result": merged, "downstream_status": results})
-	h.recordCall(projectID, agg.ID, c.Request.Method, path, http.StatusOK, int(time.Since(start)/time.Millisecond))
+	h.recordCall(c.Request.Context(), projectID, agg.ID, c.Request.Method, path, http.StatusOK, int(time.Since(start)/time.Millisecond))
 }
 
 // recordCall fires a best-effort call-log write asynchronously. Duration is
 // the total wall time of the fan-out (downstream calls + merge), which is the
 // number spec §2.7's latency distribution cares about.
-func (h *Handler) recordCall(projectID, aggID, method, path string, status, durationMs int) {
+func (h *Handler) recordCall(parent context.Context, projectID, aggID, method, path string, status, durationMs int) {
 	if h.calllog == nil || projectID == "" {
 		return
 	}
@@ -132,7 +132,7 @@ func (h *Handler) recordCall(projectID, aggID, method, path string, status, dura
 		l.AggregateID = &aggID
 	}
 	go func(l *models.CallLog) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 		defer cancel()
 		_ = h.calllog.Save(ctx, l)
 	}(l)
