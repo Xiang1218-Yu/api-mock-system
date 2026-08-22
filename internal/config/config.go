@@ -30,6 +30,14 @@ type Config struct {
 // Load reads environment variables and returns a populated Config.
 // Missing values fall back to defaults that work for local development.
 func Load() *Config {
+	burst := envInt("RATE_BURST", 100)
+	if burst < 1 {
+		burst = 1
+	}
+	rps := envFloat("RATE_RPS", 50)
+	if rps < 0 {
+		rps = 0
+	}
 	return &Config{
 		ServerPort:  envStr("SERVER_PORT", "8080"),
 		DBDSN:       envStr("DB_DSN", "api_mock.db"),
@@ -39,8 +47,8 @@ func Load() *Config {
 		AggrTimeout: envDur("AGGREGATE_TIMEOUT", 3000*time.Millisecond),
 		LogLevel:    envStr("LOG_LEVEL", "info"),
 		Env:         envStr("APP_ENV", "development"),
-		RateRPS:     envFloat("RATE_RPS", 50),
-		RateBurst:   envInt("RATE_BURST", 100),
+		RateRPS:     rps,
+		RateBurst:   burst,
 	}
 }
 

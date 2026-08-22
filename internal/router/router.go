@@ -72,7 +72,7 @@ func New(deps Deps, a *auth.Auth, rate RateConfig, log *zap.Logger) *gin.Engine 
 		api.Use(middleware.RateLimit(rate.RPS, rate.Burst, func(c *gin.Context) string {
 			if uid, ok := c.Get(string(middleware.UserIDKey)); ok {
 				if s, ok := uid.(string); ok && s != "" {
-					return "u:" + s
+					return "u:" + strings.TrimSpace(s)
 				}
 			}
 			return "ip:" + c.ClientIP()
@@ -142,7 +142,7 @@ func New(deps Deps, a *auth.Auth, rate RateConfig, log *zap.Logger) *gin.Engine 
 			if pid == "" {
 				return "ip:" + c.ClientIP()
 			}
-			return "p:" + pid
+			return "p:" + strings.TrimSpace(pid)
 		}))
 	}
 	mockGrp.Any("/:projectId/*path", deps.Mock.Serve)

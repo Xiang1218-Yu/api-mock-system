@@ -79,6 +79,12 @@ func Run(ctx context.Context) error {
 		return err
 	}
 	sharedCache := cache.New()
+	if cfg.RateBurst < 1 {
+		cfg.RateBurst = 1
+	}
+	if cfg.RateRPS < 0 {
+		cfg.RateRPS = 0
+	}
 
 	// --- repositories (data access) ---
 	userR := userrepo.New(store.DB)
