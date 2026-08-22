@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"api-mock-system/internal/apiservice"
@@ -64,6 +65,8 @@ func New(apis *apiservice.Service, overrides mockdatarepo.Repository, c *cache.C
 // status overrides, consults fixed overrides, and generates from schema when
 // no override matches. Responses are cached by request signature.
 func (s *Service) Resolve(ctx context.Context, projectID, method, path, query, body string) (*Response, error) {
+	method = normalizeMethod(method)
+	path = normalizeRequestPath(path)
 	api, err := s.apis.FindForMock(ctx, projectID, method, path)
 	if err != nil {
 		if errors.Is(err, apiservice.ErrNotFound) {
@@ -190,6 +193,21 @@ func (s *Service) sleep(ms int) {
 // matched on this string so a user can fix a response for one specific call.
 func mockKey(method, path, query, body string) string {
 	return method + " " + path + "?" + query + " " + body
+}
+
+func normalizeMethod(method string) string {
+	return strings.ToUpper(strings.TrimSpace(method))
+}
+
+func normalizeRequestPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "/"
+	}
+	if path[0] != '/' {
+		return "/" + path
+	}
+	return path
 }
 
 func defaultInt(v, def int) int {

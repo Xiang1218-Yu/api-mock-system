@@ -171,6 +171,9 @@ func buildLogger(cfg *config.Config) (*zap.Logger, error) {
 func runCacheCleanup(ctx context.Context, c *cache.Cache, log *zap.Logger) {
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
+	if c == nil {
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():

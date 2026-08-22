@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"api-mock-system/internal/apiservice"
@@ -44,12 +45,15 @@ func New(mock *mockservice.Service, calllog calllogrepo.Repository) *Handler {
 func (h *Handler) Serve(c *gin.Context) {
 	projectID := c.Param("projectId")
 	// Gin collapses the wildcard into "path" with a leading slash; trim it.
-	path := c.Param("path")
+	path := strings.TrimSpace(c.Param("path"))
+	if path == "" {
+		path = "/"
+	}
 	query := c.Request.URL.RawQuery
 	body, _ := io.ReadAll(c.Request.Body)
 
 	start := time.Now()
-	resp, err := h.mock.Resolve(c.Request.Context(), projectID, c.Request.Method, path, query, string(body))
+	resp, err := h.mock.Resolve(c.Request.Context(), projectID, strings.ToUpper(c.Request.Method), path, query, string(body))
 	// Real processing time excludes the artificial mock delay so the dashboard's
 	// latency distribution reflects engine/handler cost, not the configured lag.
 	totalMs := int(time.Since(start) / time.Millisecond)

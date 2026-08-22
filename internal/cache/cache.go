@@ -47,9 +47,11 @@ func (c *Cache) Get(key string) (any, bool) {
 	if !ok {
 		return nil, false
 	}
-	if !e.expiry.IsZero() && c.now().After(e.expiry) {
+	if !e.expiry.IsZero() && !c.now().Before(e.expiry) {
 		c.mu.Lock()
-		delete(c.data, key)
+		if current, exists := c.data[key]; exists && current.expiry.Equal(e.expiry) {
+			delete(c.data, key)
+		}
 		c.mu.Unlock()
 		return nil, false
 	}
@@ -95,7 +97,7 @@ func (c *Cache) Purge() int {
 	removed := 0
 	c.mu.Lock()
 	for k, e := range c.data {
-		if !e.expiry.IsZero() && now.After(e.expiry) {
+		if !e.expiry.IsZero() && !now.Before(e.expiry) {
 			delete(c.data, k)
 			removed++
 		}
@@ -109,5 +111,12 @@ func (c *Cache) Purge() int {
 func (c *Cache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return len(c.data)
+	now := c.now()
+	count := 0
+	for _, e := range c.data {
+		if e.expiry.IsZero() || now.Before(e.expiry) {
+			count++
+		}
+	}
+	return count
 }
