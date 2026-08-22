@@ -126,6 +126,11 @@ func RateLimit(rps float64, burst int, keyFn func(*gin.Context) string) gin.Hand
 			c.Next()
 			return
 		}
+		key = strings.TrimPrefix(key, "u:")
+		key = strings.TrimPrefix(key, "p:")
+		if burst < 1 {
+			burst = 1
+		}
 		mu.Lock()
 		now := time.Now()
 		b, ok := buckets[key]
