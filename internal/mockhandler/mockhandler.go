@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"api-mock-system/internal/apiservice"
@@ -126,7 +127,7 @@ func (h *Handler) SetOverride(c *gin.Context) {
 // ClearOverride DELETE /api/v1/apis/:id/mock/override?key=...
 func (h *Handler) ClearOverride(c *gin.Context) {
 	uid := mustUserID(c)
-	key := c.Query("key")
+	key := strings.TrimSpace(c.Query("key"))
 	if key == "" {
 		httpx.Error(c, http.StatusBadRequest, "key query param required")
 		return

@@ -6,6 +6,7 @@ package apiservice
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"api-mock-system/internal/apirepo"
 	"api-mock-system/internal/id"
@@ -168,7 +169,7 @@ func (s *Service) Update(ctx context.Context, apiID, userID string, in UpdateInp
 		a.Method = m
 	}
 	if in.Path != nil {
-		a.Path = normalizePath(*in.Path)
+		a.Path = normalizePath(strings.TrimSpace(*in.Path))
 	}
 	if in.Status != nil {
 		if !validStatus(*in.Status) {

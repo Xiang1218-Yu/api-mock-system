@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"api-mock-system/internal/id"
 	"api-mock-system/internal/models"
@@ -35,6 +36,10 @@ func New(db *gorm.DB) Repository { return &repo{db: db} }
 // because SQLite's ON CONFLICT target on (api_id, key) isn't portable across
 // drivers in GORM's high-level API.
 func (r *repo) Set(ctx context.Context, m *models.MockData) error {
+	m.Key = strings.TrimSpace(m.Key)
+	if m.APIID == "" || m.Key == "" {
+		return fmt.Errorf("mockdatarepo: api and key are required")
+	}
 	tx := r.db.WithContext(ctx)
 	res := tx.Model(&models.MockData{}).
 		Where("api_id = ? AND key = ?", m.APIID, m.Key).
@@ -55,6 +60,8 @@ func (r *repo) Set(ctx context.Context, m *models.MockData) error {
 }
 
 func (r *repo) Get(ctx context.Context, apiID, key string) (*models.MockData, error) {
+	apiID = strings.TrimSpace(apiID)
+	key = strings.TrimSpace(key)
 	var m models.MockData
 	err := r.db.WithContext(ctx).
 		Where("api_id = ? AND key = ? AND enabled = ?", apiID, key, true).

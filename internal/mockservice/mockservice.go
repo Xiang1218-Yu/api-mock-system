@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"api-mock-system/internal/apiservice"
@@ -78,7 +79,7 @@ func (s *Service) Resolve(ctx context.Context, projectID, method, path, query, b
 		return nil, err
 	}
 
-	cacheKey := "mock:" + api.ID + "|" + method + "|" + path + "|" + query
+	cacheKey := "mock:" + api.ID + "|" + method + "|" + path + "|" + strings.TrimSpace(query)
 	if v, ok := s.cache.Get(cacheKey); ok {
 		if r, ok := v.(*Response); ok {
 			// Delay still applies to cached responses, per "response delay simulation".
@@ -136,7 +137,7 @@ func (s *Service) SetOverride(ctx context.Context, apiID, userID string, in Over
 	if err := s.overrides.Set(ctx, &models.MockData{
 		Base:    models.Base{ID: id.NewUUID()},
 		APIID:   apiID,
-		Key:     in.Key,
+		Key:     strings.TrimSpace(in.Key),
 		Value:   in.Value,
 		Enabled: enabled,
 	}); err != nil {
@@ -172,7 +173,7 @@ func (s *Service) ListOverrides(ctx context.Context, apiID, userID string) ([]mo
 // purge is scoped — other APIs' cached responses survive.
 func (s *Service) Invalidate(ctx context.Context, apiID string) {
 	_ = ctx
-	s.cache.DeleteByPrefix("mock:" + apiID + "|")
+	s.cache.DeleteByPrefix("mock:" + strings.TrimSpace(apiID))
 }
 
 // sleep applies the configured mock delay, capped at 5s per the spec range.
