@@ -1,0 +1,48 @@
+# docker-compose for local containerized development.
+#
+# NOTE: system.md specifies PostgreSQL + Redis as dependencies. This stack runs
+# the app on its built-in SQLite store + in-process cache, so only the app
+# container is required here. The commented postgres/redis blocks show how the
+# deployment would look once the storage layer is swapped to the Postgres-backed
+# repository implementations.
+version: "3.9"
+
+services:
+  api-mock:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      JWT_SECRET: "change-me-in-production"
+      APP_ENV: "production"
+      LOG_LEVEL: "info"
+      DB_DSN: "/app/data/api_mock.db"
+      MOCK_BASE_URL: "http://localhost:8080/mock"
+      AGGREGATE_TIMEOUT: "3000"
+    volumes:
+      - api-mock-data:/app/data
+    restart: unless-stopped
+
+  # --- Optional external stores (not used by the SQLite build) -------------
+  # Uncomment when the Postgres/Redis repository implementations are wired in.
+  #
+  # postgres:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: api_mock
+  #     POSTGRES_USER: api_mock
+  #     POSTGRES_PASSWORD: api_mock123
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #
+  # redis:
+  #   image: redis:7
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  api-mock-data:
+  # pg-data:
