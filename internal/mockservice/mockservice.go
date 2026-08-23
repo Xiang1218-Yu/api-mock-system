@@ -186,16 +186,29 @@ func (s *Service) sleep(ms int) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
-// mockKey derives the override key from the request. Override entries are
-// matched on this string so a user can fix a response for one specific call.
-func mockKey(method, path, query, body string) string {
+// requestSignature is the request identity shared by override lookup and the
+// response cache. It must include query and body: two calls to the same
+// published API that differ only by query params or JSON body are distinct
+// requests and must never share a result. Keeping override and cache keyed on
+// the same signature guarantees a fixed override only answers its own request —
+// it cannot leak into a generated response, and a generated response cannot
+// mask a fixed one.
+func requestSignature(method, path, query, body string) string {
 	return method + " " + path + "?" + query + " " + body
 }
 
+// mockKey derives the override key from the request signature. Override entries
+// are matched on this string so a user can fix a response for one specific call.
+func mockKey(method, path, query, body string) string {
+	return requestSignature(method, path, query, body)
+}
+
+// mockCacheKey derives the cache key from the request signature. It prefixes the
+// shared signature with "mock:<apiID>|" so Invalidate's prefix purge stays
+// scoped to one API; the suffix carries the full signature so two requests
+// that differ only by query or body land on different cache entries.
 func mockCacheKey(apiID, method, path, query, body string) string {
-	_ = query
-	_ = body
-	return "mock:" + apiID + "|" + method + "|" + path
+	return "mock:" + apiID + "|" + requestSignature(method, path, query, body)
 }
 
 func defaultInt(v, def int) int {

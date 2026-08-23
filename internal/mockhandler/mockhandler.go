@@ -45,7 +45,10 @@ func (h *Handler) Serve(c *gin.Context) {
 	projectID := c.Param("projectId")
 	// Gin collapses the wildcard into "path" with a leading slash; trim it.
 	path := c.Param("path")
-	query := c.Request.URL.Query().Get("q")
+	// The full raw query participates in request isolation: two calls that
+	// differ by any query param (not just "q") must resolve to independent
+	// responses, so we forward the whole query string rather than a single key.
+	query := c.Request.URL.RawQuery
 	body, _ := io.ReadAll(c.Request.Body)
 
 	start := time.Now()

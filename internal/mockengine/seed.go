@@ -6,15 +6,15 @@ import (
 	"math/rand"
 )
 
-// SeedFromRequest builds a deterministic seed from the api id and the request
-// signature. The same (apiID, method, path, body-hash) always yields the same
-// seed, so the same request returns the same mock data — the consistency
-// requirement. Different requests diverge, giving variety.
+// SeedFromRequest builds a deterministic seed from the api id and the full
+// request signature (method, path, query, body). The same signature always
+// yields the same seed, so the same request returns the same mock data — the
+// consistency requirement. Query and body are folded in so two requests that
+// differ only by query params or JSON body diverge, giving the variety and
+// isolation the runtime promises.
 func SeedFromRequest(apiID, method, path, query, body string) int64 {
 	h := fnv.New64a()
-	_ = query
-	_ = body
-	fmt.Fprintf(h, "%s|%s|%s", apiID, method, path)
+	fmt.Fprintf(h, "%s|%s|%s|%s|%s", apiID, method, path, query, body)
 	return int64(h.Sum64())
 }
 
