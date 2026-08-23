@@ -21,7 +21,7 @@ type Base struct {
 // User represents an account that can authenticate and own/be a member of projects.
 type User struct {
 	Base
-	Email        string `gorm:"type:text" json:"email"`
+	Email        string `gorm:"type:text;uniqueIndex:idx_users_email" json:"email"`
 	PasswordHash string `gorm:"type:text" json:"-"`
 	Name         string `gorm:"type:text" json:"name"`
 }

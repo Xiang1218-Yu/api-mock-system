@@ -4,6 +4,7 @@
 package userhandler
 
 import (
+	"errors"
 	"net/http"
 
 	"api-mock-system/internal/httpx"
@@ -28,12 +29,14 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 	u, err := h.users.Register(c.Request.Context(), in)
 	if err != nil {
-		switch err.Error() {
-		case userservice.ErrEmailTaken.Error():
-			httpx.Error(c, http.StatusBadRequest, err.Error())
-		default:
-			httpx.Error(c, http.StatusBadRequest, err.Error())
+		// A taken email — whether caught by the pre-check or by the unique
+		// index after a lost race — is a conflict with the existing account,
+		// not a malformed request. Everything else is an internal failure.
+		if errors.Is(err, userservice.ErrEmailTaken) {
+			httpx.Error(c, http.StatusConflict, err.Error())
+			return
 		}
+		httpx.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	httpx.Created(c, u)

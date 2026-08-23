@@ -6,8 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
+	"api-mock-system/internal/email"
 	"api-mock-system/internal/models"
 
 	"gorm.io/gorm"
@@ -15,6 +15,11 @@ import (
 
 // ErrNotFound is returned when a single-row lookup misses.
 var ErrNotFound = errors.New("user not found")
+
+// ErrEmailConflict is returned by Create when the email uniqueness constraint
+// rejects an insert. It is the signal that a concurrent registration race lost
+// to the other request — the caller maps it to a 409, not a 500.
+var ErrEmailConflict = errors.New("email already registered")
 
 // Repository is the contract every user-service consumer depends on.
 // A future Postgres-backed implementation need only satisfy this interface.
@@ -33,14 +38,20 @@ func New(db *gorm.DB) Repository { return &repo{db: db} }
 
 func (r *repo) Create(ctx context.Context, u *models.User) error {
 	if err := r.db.WithContext(ctx).Create(u).Error; err != nil {
+		// The unique index on email is the last line of defense against the
+		// register race: when the check-then-create window loses, the DB
+		// rejects the insert and we translate it to a domain conflict.
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrEmailConflict
+		}
 		return fmt.Errorf("userrepo: create: %w", err)
 	}
 	return nil
 }
 
-func (r *repo) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *repo) FindByEmail(ctx context.Context, emailAddr string) (*models.User, error) {
 	var u models.User
-	if err := r.db.WithContext(ctx).Where("email = ?", strings.TrimSpace(email)).First(&u).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("email = ?", email.Normalize(emailAddr)).First(&u).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"api-mock-system/internal/auth"
+	"api-mock-system/internal/email"
 	"api-mock-system/internal/id"
 	"api-mock-system/internal/models"
 	"api-mock-system/internal/userrepo"
@@ -44,9 +45,15 @@ func New(users userrepo.Repository, a *auth.Auth) *Service {
 }
 
 // Register creates a new user and returns the persisted record (sans password).
+//
+// Email is normalized (trimmed + lowercased) once here, so the stored value is
+// the canonical identity. Concurrency is bounded by the email unique index: the
+// pre-check is a fast path that returns 409 in the common case, and the DB
+// constraint catches the loser of a lost-update race where two requests pass
+// the check simultaneously. Either path yields ErrEmailTaken -> 409.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (*models.User, error) {
-	email := strings.TrimSpace(in.Email)
-	if _, err := s.users.FindByEmail(ctx, email); err == nil {
+	emailAddr := email.Normalize(in.Email)
+	if _, err := s.users.FindByEmail(ctx, emailAddr); err == nil {
 		return nil, ErrEmailTaken
 	} else if !errors.Is(err, userrepo.ErrNotFound) {
 		return nil, err
@@ -58,20 +65,26 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*models.User,
 	}
 	u := &models.User{
 		Base:         models.Base{ID: id.NewUUID()},
-		Email:        email,
+		Email:        emailAddr,
 		PasswordHash: hash,
 		Name:         strings.TrimSpace(in.Name),
 	}
 	if err := s.users.Create(ctx, u); err != nil {
+		// Lost the race: the other request committed first and the unique
+		// index rejected this insert. Surface it as a conflict, not a 500.
+		if errors.Is(err, userrepo.ErrEmailConflict) {
+			return nil, ErrEmailTaken
+		}
 		return nil, err
 	}
 	return u, nil
 }
 
-// Login validates credentials and returns the user plus a signed JWT.
+// Login validates credentials and returns the user plus a signed JWT. The email
+// is normalized before lookup so the casing used at registration time does not
+// matter: "User@X.com" registered, "user@x.com" logs in — same row.
 func (s *Service) Login(ctx context.Context, in LoginInput) (*models.User, string, error) {
-	email := strings.TrimSpace(in.Email)
-	u, err := s.users.FindByEmail(ctx, email)
+	u, err := s.users.FindByEmail(ctx, email.Normalize(in.Email))
 	if err != nil {
 		if errors.Is(err, userrepo.ErrNotFound) {
 			return nil, "", ErrInvalidCredentials
@@ -94,6 +107,8 @@ func (s *Service) Get(ctx context.Context, userID string) (*models.User, error) 
 }
 
 // GetByEmail looks up a user by email; used when resolving an invitee.
-func (s *Service) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	return s.users.FindByEmail(ctx, strings.TrimSpace(email))
+// Normalizes the input so an invite issued with mismatched casing still
+// resolves to the registered account.
+func (s *Service) GetByEmail(ctx context.Context, emailAddr string) (*models.User, error) {
+	return s.users.FindByEmail(ctx, email.Normalize(emailAddr))
 }
