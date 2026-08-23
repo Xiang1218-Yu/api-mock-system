@@ -28,9 +28,8 @@ func (h *Handler) OpenAPIJSON(c *gin.Context) {
 		httpx.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	c.Header("Content-Type", "application/json")
-	c.Header("Content-Disposition", "attachment; filename=openapi.yaml")
-	c.Data(http.StatusOK, "application/json", data)
+	c.Header("Content-Disposition", `attachment; filename="openapi.json"`)
+	c.Data(http.StatusOK, "application/json; charset=utf-8", data)
 }
 
 // OpenAPIYAML GET /api/v1/projects/:projectId/docs/openapi.yaml
@@ -41,7 +40,8 @@ func (h *Handler) OpenAPIYAML(c *gin.Context) {
 		httpx.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	c.Data(http.StatusOK, "application/json", data)
+	c.Header("Content-Disposition", `attachment; filename="openapi.yaml"`)
+	c.Data(http.StatusOK, "application/yaml; charset=utf-8", data)
 }
 
 // Preview GET /api/v1/projects/:projectId/docs/preview

@@ -117,7 +117,11 @@ func Build(project *models.Project, apis []models.API) *Document {
 		}
 		item := doc.Paths[path]
 		op := buildOperation(a)
-		assignOp(&item, method, op)
+		if !assignOp(&item, method, op) {
+			// Unknown HTTP method: skip rather than silently drop via a missed
+			// switch branch, so every published API is accounted for.
+			continue
+		}
 		doc.Paths[path] = item
 	}
 	return doc
@@ -183,21 +187,26 @@ func openAPIPath(p string) string {
 }
 
 // assignOp places an operation under the right method field of a PathItem.
-func assignOp(item *PathItem, method string, op *Operation) {
+// method must be lowercased; the returned bool is false when the method is not
+// a recognized HTTP verb so the caller can skip instead of silently dropping it.
+func assignOp(item *PathItem, method string, op *Operation) bool {
 	switch method {
-	case "GET":
+	case "get":
 		item.Get = op
-	case "POST":
+	case "post":
 		item.Post = op
-	case "PUT":
+	case "put":
 		item.Put = op
-	case "DELETE":
+	case "delete":
 		item.Delete = op
-	case "PATCH":
+	case "patch":
 		item.Patch = op
-	case "OPTIONS":
+	case "options":
 		item.Options = op
+	default:
+		return false
 	}
+	return true
 }
 
 // extractParameters pulls query/path/header parameter schemas out of a request

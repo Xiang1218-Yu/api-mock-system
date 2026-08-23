@@ -47,7 +47,7 @@ func (s *Service) OpenAPIYAML(ctx context.Context, projectID, userID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	return openapi.ToJSON(doc)
+	return openapi.ToYAML(doc)
 }
 
 // build assembles the document. Viewer+ authorization is enforced on the
