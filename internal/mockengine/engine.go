@@ -128,11 +128,30 @@ func (e *Engine) generateObject(schema map[string]any, path string) map[string]a
 }
 
 // generateArray builds an array of 0..maxItems items from the "items" schema.
+//
+// The "items" keyword is matched defensively: it may be a single schema
+// (map[string]any), a tuple of schemas ([]any — JSON Schema's tuple form, in
+// which case we reuse the first schema for every element), or absent/invalid
+// (in which case each element falls back to a generated string). None of these
+// branches panics — a malformed array schema yields an array of safe defaults
+// rather than crashing the mock service.
 func (e *Engine) generateArray(schema map[string]any, path string) []any {
-	items, _ := schema["items"].(map[string]any)
-	if items == nil {
-		items = schema["items"].(map[string]any)
+	var items map[string]any
+	switch v := schema["items"].(type) {
+	case map[string]any:
+		items = v
+	case []any:
+		// Tuple-form items: [schemaA, schemaB, ...]. Pick the first schema for
+		// all generated elements so the element shape stays consistent.
+		if len(v) > 0 {
+			if first, ok := v[0].(map[string]any); ok {
+				items = first
+			}
+		}
 	}
+	// items may still be nil (absent or unrecognized). Reading a nil map is safe
+	// in Go, so generateNode falls through to its default branch and emits a
+	// string — a valid, non-crashing array element.
 	minItems, maxItems := 1, 3
 	if n, ok := schema["minItems"]; ok {
 		minItems = toInt(n, minItems)

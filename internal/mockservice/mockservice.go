@@ -23,6 +23,12 @@ var (
 	ErrNotFound = errors.New("mock route not found")
 	// ErrNotPublished is returned when the matched API is not published.
 	ErrNotPublished = errors.New("api is not published")
+	// ErrInvalidSchema is returned when a published API's response schema is
+	// structurally broken in a way that prevents generating a well-formed mock
+	// (e.g. declares "type":"array" but the generator yields a non-array). It is
+	// a controlled service error rather than a crashed request, so the client
+	// still gets a normal HTTP response.
+	ErrInvalidSchema = errors.New("mock response schema is malformed")
 )
 
 // Response is the mock service's resolved answer.
@@ -103,15 +109,22 @@ func (s *Service) Resolve(ctx context.Context, projectID, method, path, query, b
 	// 2. Otherwise generate from the response schema, deterministically.
 	engine := mockengine.NewSeeded(api.ID, method, path, query, body)
 	var mockBody any
-	if len(api.ResponseSchema) > 0 {
-		responseSchema := api.ResponseSchema
-		if responseSchema["type"] == "array" {
-			responseSchema = responseSchema["items"].(models.JSONMap)
+	switch {
+	case len(api.ResponseSchema) > 0:
+		// The engine dispatches on the schema's "type" itself, including
+		// "array" (it returns a []any honoring items/minItems/maxItems), so the
+		// full response schema is handed over verbatim. Do NOT unwrap "items"
+		// here: that would both flatten an array response into a single element
+		// (wrong shape) and require an unchecked type assertion that panics when
+		// items is the JSON-decoded map[string]any rather than models.JSONMap.
+		generated, err := generateMockBody(engine, api.ResponseSchema)
+		if err != nil {
+			return nil, err
 		}
-		mockBody = engine.Generate(responseSchema)
-	} else if len(api.ResponseExample) > 0 {
+		mockBody = generated
+	case len(api.ResponseExample) > 0:
 		mockBody = api.ResponseExample
-	} else {
+	default:
 		mockBody = map[string]any{"message": "mock response", "ok": true}
 	}
 	resp := &Response{
@@ -201,6 +214,48 @@ func defaultInt(v, def int) int {
 		return def
 	}
 	return v
+}
+
+// generateMockBody runs the engine against the response schema and turns any
+// failure — a malformed schema that would otherwise panic, or a declared type
+// the generator could not honor — into a controlled ErrInvalidSchema instead of
+// a crashed request.
+//
+// "A well-formed schema should return normally": a schema whose declared
+// "type" matches the generated value's shape succeeds. "A malformed schema
+// should become a controlled service error": anything that panics, or yields a
+// value whose kind contradicts a declared array type, is reported as an error
+// the handler can map to a 500 without dropping the connection.
+func generateMockBody(engine *mockengine.Engine, schema models.JSONMap) (any, error) {
+	var (
+		body any
+		ok   bool
+	)
+	// The engine is pure and panic-safe for the cases it handles, but a schema
+	// authored with an unexpected keyword shape could still trip an assertion
+	// somewhere downstream. Recover so the caller sees an error, never a crash.
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ok = false
+			}
+		}()
+		body = engine.Generate(schema)
+		ok = true
+	}()
+	if !ok {
+		return nil, ErrInvalidSchema
+	}
+	// Shape check: an array response must serialize as a JSON array. The engine
+	// returns []any for "type":"array"; if it produced anything else, the schema
+	// was structurally inconsistent — surface it as a controlled error rather
+	// than returning a non-array body for a declared array.
+	if schema["type"] == "array" {
+		if _, isArr := body.([]any); !isArr {
+			return nil, ErrInvalidSchema
+		}
+	}
+	return body, nil
 }
 
 // MarshalBody renders a Response body to bytes for the HTTP writer.
