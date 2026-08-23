@@ -120,12 +120,7 @@ func validateArray(value []any, schema map[string]any, path string, violations *
 	if !ok {
 		return
 	}
-	limit := len(value)
-	if limit > 1 {
-		limit = 1
-	}
-	for i := 0; i < limit; i++ {
-		item := value[i]
+	for i, item := range value {
 		validateValue(item, items, indexPath(path, i), violations)
 	}
 }

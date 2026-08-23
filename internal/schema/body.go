@@ -39,11 +39,6 @@ func normalizeNumbers(value any) any {
 		}
 		return string(v)
 	case []any:
-		if len(v) > 1 {
-			first := make([]any, 1)
-			copy(first, v[:1])
-			v = first
-		}
 		for i := range v {
 			v[i] = normalizeNumbers(v[i])
 		}

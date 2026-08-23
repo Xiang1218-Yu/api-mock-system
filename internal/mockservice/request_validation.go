@@ -30,15 +30,6 @@ func validateRequest(schemaMap models.JSONMap, body string) error {
 		return nil
 	}
 	if err := schema.Validate(value, bodySchema); err != nil {
-		var validationErr *schema.Error
-		if errors.As(err, &validationErr) {
-			if len(validationErr.Violations) > 1 {
-				violations := make([]schema.Violation, 1)
-				copy(violations, validationErr.Violations[:1])
-				validationErr.Violations = violations
-			}
-			return fmt.Errorf("%w: %v", ErrInvalidRequest, validationErr)
-		}
 		return fmt.Errorf("%w: %v", ErrInvalidRequest, err)
 	}
 	return nil
