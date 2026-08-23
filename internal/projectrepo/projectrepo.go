@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"api-mock-system/internal/models"
 
@@ -16,6 +17,11 @@ import (
 
 // ErrNotFound is returned when a project lookup misses.
 var ErrNotFound = errors.New("project not found")
+
+// ErrMemberExists is returned when AddMember hits the (project_id, user_id)
+// unique constraint — i.e. the user is already a member of the project.
+// Callers translate this into a duplicate-invite conflict rather than a 5xx.
+var ErrMemberExists = errors.New("project member already exists")
 
 // MemberRole is one of admin|editor|viewer.
 type MemberRole string
@@ -106,9 +112,25 @@ func (r *repo) List(ctx context.Context, visibleToUserID string, q string, limit
 
 func (r *repo) AddMember(ctx context.Context, m *models.ProjectMember) error {
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		// A UNIQUE violation on the (project_id, user_id) index means the
+		// user is already a member — surface a sentinel so the service can
+		// map it to a duplicate-invite conflict instead of a generic 5xx.
+		if isDuplicateKey(err) {
+			return ErrMemberExists
+		}
 		return fmt.Errorf("projectrepo: add member conflict: %w", err)
 	}
 	return nil
+}
+
+// isDuplicateKey reports whether err is a UNIQUE-constraint violation. GORM
+// sets gorm.ErrDuplicatedKey for supported drivers; we also match the SQLite
+// driver's raw message as a fallback so older gorm/sqlite builds are covered.
+func isDuplicateKey(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 func (r *repo) RemoveMember(ctx context.Context, projectID, userID string) error {

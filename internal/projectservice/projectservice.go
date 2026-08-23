@@ -21,6 +21,10 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	// ErrInvalidRole is returned when an unrecognized role is supplied.
 	ErrInvalidRole = errors.New("invalid role")
+	// ErrMemberExists is returned when an invite targets a user who is already
+	// a member of the project. The role and authz rules still apply first, so
+	// this only surfaces after the invite has cleared those checks.
+	ErrMemberExists = errors.New("project member already exists")
 )
 
 // CreateInput captures the fields needed to create a project.
@@ -154,6 +158,12 @@ func (s *Service) List(ctx context.Context, userID, query string, page, size int
 // InviteMember adds a member with the given role; admin-only. The member's
 // user id is resolved by the caller (the handler looks up the email), so this
 // method takes the resolved user id directly.
+//
+// Authz and role validation run before the insert, so a forbidden actor or an
+// invalid role is still reported under the original rules. A genuine
+// duplicate invite surfaces as ErrMemberExists rather than being masked as a
+// generic failure — the repo's duplicate-key detection lets us tell the two
+// apart instead of returning a blanket error.
 func (s *Service) InviteMember(ctx context.Context, projectID, actorID, inviteeID, role string) error {
 	if err := s.requireRole(ctx, projectID, actorID, projectrepo.RoleAdmin); err != nil {
 		return err
@@ -167,7 +177,10 @@ func (s *Service) InviteMember(ctx context.Context, projectID, actorID, inviteeI
 		UserID:    inviteeID,
 		Role:      role,
 	}); err != nil {
-		return ErrForbidden
+		if errors.Is(err, projectrepo.ErrMemberExists) {
+			return ErrMemberExists
+		}
+		return err
 	}
 	return nil
 }

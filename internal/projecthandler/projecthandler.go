@@ -103,7 +103,7 @@ func (h *Handler) InviteMember(c *gin.Context) {
 		return
 	}
 	if err := h.projects.InviteMember(c.Request.Context(), c.Param("projectId"), uid, invitee.ID, in.Role); err != nil {
-		httpx.Error(c, http.StatusConflict, err.Error())
+		writeServiceErr(c, err)
 		return
 	}
 	httpx.Created(c, gin.H{"user_id": invitee.ID, "role": in.Role})
@@ -171,6 +171,8 @@ func writeServiceErr(c *gin.Context, err error) {
 		httpx.Error(c, http.StatusForbidden, err.Error())
 	case errors.Is(err, projectservice.ErrInvalidRole):
 		httpx.Error(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, projectservice.ErrMemberExists):
+		httpx.Error(c, http.StatusConflict, err.Error())
 	default:
 		httpx.Error(c, http.StatusInternalServerError, err.Error())
 	}

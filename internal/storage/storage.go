@@ -59,6 +59,18 @@ func Open(ctx context.Context, dsn string, log *zap.Logger) (*Store, error) {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
 
+	// Drop the legacy single-column index on project_members(project_id).
+	// An earlier schema version declared that column UNIQUE, which capped a
+	// project at one member and made every second invitation fail with
+	// "UNIQUE constraint failed: project_members.project_id". AutoMigrate
+	// creates the corrected (project_id, user_id) composite unique index above
+	// but will not remove indexes that no longer appear in the model, so we
+	// drop the stale one explicitly. Ignore the error if it is already gone.
+	if err := db.WithContext(ctx).Migrator().DropIndex(&models.ProjectMember{}, "idx_project_members_project_id"); err != nil {
+		log.Debug("drop legacy project_members.project_id index (already absent?)",
+			zap.Error(err))
+	}
+
 	log.Info("database ready", zap.String("dsn", dsn))
 	return &Store{DB: db, Log: log}, nil
 }

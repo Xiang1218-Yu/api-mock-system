@@ -39,8 +39,12 @@ type Project struct {
 // ProjectMember links a user to a project with an assigned role.
 type ProjectMember struct {
 	Base
-	ProjectID string `gorm:"type:text;uniqueIndex" json:"project_id"`
-	UserID    string `gorm:"type:text;index" json:"user_id"`
+	// The composite unique index (project_id, user_id) lets one project hold
+	// many distinct members while still rejecting a re-invite of the same
+	// user. A single-column unique index on project_id would cap a project at
+	// one member, which is what made the second invitation fail.
+	ProjectID string `gorm:"type:text;uniqueIndex:idx_project_members_project_user,priority:1" json:"project_id"`
+	UserID    string `gorm:"type:text;uniqueIndex:idx_project_members_project_user,priority:2;index:idx_project_members_user_id" json:"user_id"`
 	Role      string `gorm:"type:text" json:"role"` // admin|editor|viewer
 }
 
