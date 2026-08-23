@@ -1,0 +1,14 @@
+# Build artifacts and local state — never copied into the image.
+bin/
+api_mock.db
+api_mock.db-wal
+api_mock.db-shm
+*.db
+*.db-*
+/tmp/
+.DS_Store
+*.log
+README.md
+system.md
+Makefile
+.claude/
