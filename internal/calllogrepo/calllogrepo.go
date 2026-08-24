@@ -45,8 +45,10 @@ type BucketCount struct {
 }
 
 // Buckets are the latency ranges (in milliseconds) reported by
-// DurationBuckets, in ascending order. A call lands in the first range whose
-// upper bound it does not exceed; the final range is open-ended.
+// DurationBuckets, in ascending order. Ranges are half-open [lower, upper):
+// a call lands in the first range whose upper bound it falls strictly below,
+// so a call at exactly the boundary (e.g. 10ms) goes into the next range up.
+// The final range is open-ended.
 var Buckets = []struct {
 	Label string
 	Max   int // exclusive upper bound; 0 means open-ended
@@ -165,7 +167,10 @@ func bucketLabel(ms int) string {
 		ms = 0
 	}
 	for _, b := range Buckets {
-		if b.Max == 0 || ms <= b.Max {
+		// Ranges are [lower, upper): a call at exactly the boundary belongs to
+		// the next range up, so the upper bound is exclusive — `10ms` falls in
+		// 10-50ms, not 0-10ms. The final range (Max == 0) is open-ended.
+		if b.Max == 0 || ms < b.Max {
 			return b.Label
 		}
 	}

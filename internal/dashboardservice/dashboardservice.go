@@ -178,11 +178,12 @@ func (s *Service) DurationDistribution(ctx context.Context, projectID, userID st
 	}
 	// Re-key into {bucket -> slice index} so mutations land on the exact slice
 	// entries the caller receives (pointer-to-loop-var would alias and the
-	// appended copies would never see the counts).
+	// appended copies would never see the counts). Buckets are already in
+	// ascending order (fast → slow); preserve that order so the chart renders
+	// top-to-bottom as the front end expects.
 	bk := make(map[string]int, len(calllogrepo.Buckets))
 	out := make([]LatencyBucket, 0, len(calllogrepo.Buckets))
-	for i := len(calllogrepo.Buckets) - 1; i >= 0; i-- {
-		b := calllogrepo.Buckets[i]
+	for _, b := range calllogrepo.Buckets {
 		bk[b.Label] = len(out)
 		out = append(out, LatencyBucket{Bucket: b.Label})
 	}

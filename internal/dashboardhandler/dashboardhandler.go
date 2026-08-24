@@ -51,9 +51,6 @@ func (h *Handler) Duration(c *gin.Context) {
 		httpx.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if len(dist.Buckets) > 1 {
-		dist.Buckets = append(dist.Buckets[1:], dist.Buckets[0])
-	}
 	httpx.OK(c, dist)
 }
 
