@@ -7,11 +7,17 @@ import (
 	"api-mock-system/internal/apirepo"
 )
 
+// normalizeMethod upper-cases and validates the HTTP method. It returns the
+// canonical uppercase form (matching net/http's http.Method* constants and the
+// raw value of http.Request.Method) so a stored method compares directly with an
+// inbound request method. The mock resolver and the OpenAPI builder both assume
+// uppercase; storing lowercase here made published POSTs (and every other
+// method) unreachable — the stored value never matched the inbound method.
 func normalizeMethod(m string) string {
 	m = strings.ToUpper(strings.TrimSpace(m))
 	switch m {
 	case "GET", "POST", "PUT", "DELETE", "PATCH":
-		return strings.ToLower(m)
+		return m
 	}
 	return ""
 }

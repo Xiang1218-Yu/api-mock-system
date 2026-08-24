@@ -26,7 +26,7 @@ func (s *Service) FindForMock(ctx context.Context, projectID, method, path strin
 	}
 	for i := range apis {
 		a := &apis[i]
-		if a.Method != strings.ToUpper(method) {
+		if !strings.EqualFold(a.Method, method) {
 			continue
 		}
 		if _, ok := pathmatch.Match(a.Path, path); ok {
