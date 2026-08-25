@@ -1,11 +1,20 @@
-# 评测用镜像：保留完整 Go 工具链（go1.26.5），依赖构建期预下载。
-FROM golang:1.26.5
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN go build ./...
-CMD ["bash"]
+# syntax=docker/dockerfile:1.7
+# 官方 Go 镜像，自带完整工具链
+FROM golang:1.25.0
 
-# 多架构交叉构建示例（如需交付双架构镜像）：
-# docker buildx build --platform linux/arm64,linux/amd64 -f benzhi.Dockerfile -t <image> .
+WORKDIR /app
+
+# 先复制依赖文件并下载依赖，使用 BuildKit 缓存长期复用模块下载
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-cache \
+    go mod download
+
+# 复制所有项目文件
+COPY . .
+
+# 预编译，确认基础代码健康
+RUN --mount=type=cache,target=/root/.cache/go-build,id=go-build-cache \
+    go build ./...
+
+# 容器启动后进入 shell，方便模型操作
+CMD ["bash"]
