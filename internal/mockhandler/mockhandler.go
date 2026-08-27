@@ -17,6 +17,7 @@ import (
 	"api-mock-system/internal/middleware"
 	"api-mock-system/internal/mockservice"
 	"api-mock-system/internal/models"
+	"api-mock-system/internal/pathmatch"
 	"api-mock-system/internal/projectservice"
 
 	"github.com/gin-gonic/gin"
@@ -43,8 +44,11 @@ func New(mock *mockservice.Service, calllog calllogrepo.Repository) *Handler {
 // isolation to the management surface.)
 func (h *Handler) Serve(c *gin.Context) {
 	projectID := c.Param("projectId")
-	// Gin collapses the wildcard into "path" with a leading slash; trim it.
-	path := c.Param("path")
+	// Gin collapses the wildcard into "path" with a leading slash. Normalize it
+	// (drop trailing slash) so cache keys, override keys, call-logs, and pattern
+	// matching all see one shape regardless of whether the caller sent "/users"
+	// or "/users/". This mirrors the storage-side rule in apiservice.Create.
+	path := pathmatch.Normalize(c.Param("path"))
 	query := c.Request.URL.RawQuery
 	body, _ := io.ReadAll(c.Request.Body)
 

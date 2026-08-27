@@ -14,6 +14,7 @@ import (
 	"api-mock-system/internal/apiservice"
 	"api-mock-system/internal/id"
 	"api-mock-system/internal/models"
+	"api-mock-system/internal/pathmatch"
 	"api-mock-system/internal/projectservice"
 	"go.uber.org/zap"
 )
@@ -23,6 +24,8 @@ var (
 	ErrNotFound = errors.New("aggregate not found")
 	// ErrInvalidMode is returned for an unrecognized aggregation mode.
 	ErrInvalidMode = errors.New("mode must be serial, parallel, or conditional")
+	// ErrConflict is returned when a duplicate path is created within a project.
+	ErrConflict = errors.New("aggregate with this path already exists")
 )
 
 // CreateInput captures the fields needed to define an aggregate.
@@ -85,12 +88,21 @@ func (s *Service) Create(ctx context.Context, actorID, projectID string, in Crea
 	if !validMode(in.Mode) {
 		return nil, ErrInvalidMode
 	}
+	// Normalize the path so "/agg" and "/agg/" cannot be stored as two resources,
+	// and reject a duplicate path within the project — same rule apiservice
+	// applies to API definitions, so the two resource kinds behave identically.
+	path := pathmatch.Normalize(in.Path)
+	if _, err := s.aggregates.FindByProjectAndPath(ctx, projectID, path); err == nil {
+		return nil, ErrConflict
+	} else if !errors.Is(err, aggregaterepo.ErrNotFound) {
+		return nil, err
+	}
 	a := &models.Aggregate{
 		Base:           models.Base{ID: id.NewUUID()},
 		ProjectID:      projectID,
 		Name:           in.Name,
 		Description:    in.Description,
-		Path:           in.Path,
+		Path:           path,
 		Mode:           in.Mode,
 		Timeout:        defaultTimeout(in.Timeout, int(s.defaultTimeout/time.Millisecond)),
 		DownstreamAPIs: in.DownstreamAPIs,
@@ -144,7 +156,17 @@ func (s *Service) Update(ctx context.Context, id, userID string, in UpdateInput)
 		a.Description = *in.Description
 	}
 	if in.Path != nil {
-		a.Path = *in.Path
+		// Apply the same normalization + conflict check as Create, so an update
+		// cannot silently collide with another aggregate's path.
+		newPath := pathmatch.Normalize(*in.Path)
+		if newPath != a.Path {
+			if _, err := s.aggregates.FindByProjectAndPath(ctx, a.ProjectID, newPath); err == nil {
+				return nil, ErrConflict
+			} else if !errors.Is(err, aggregaterepo.ErrNotFound) {
+				return nil, err
+			}
+		}
+		a.Path = newPath
 	}
 	if in.Mode != nil {
 		if !validMode(*in.Mode) {

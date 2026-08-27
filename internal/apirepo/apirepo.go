@@ -54,10 +54,15 @@ func (r *repo) FindByID(ctx context.Context, id string) (*models.API, error) {
 	return &a, nil
 }
 
+// FindByProjectAndPath looks up an API by its (project, method, path) key. The
+// path MUST be normalized via pathmatch.Normalize by the caller — storage writes
+// the same normalized form, so the lookup uses exact equality. (Earlier code
+// appended a trailing slash here, which never matched the stored value and let
+// duplicates slip through; that asymmetry is now gone.)
 func (r *repo) FindByProjectAndPath(ctx context.Context, projectID, method, path string) (*models.API, error) {
 	var a models.API
 	err := r.db.WithContext(ctx).
-		Where("project_id = ? AND method = ? AND path = ?", projectID, method, path+"/").
+		Where("project_id = ? AND method = ? AND path = ?", projectID, method, path).
 		First(&a).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound

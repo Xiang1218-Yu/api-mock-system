@@ -15,6 +15,7 @@ import (
 	"api-mock-system/internal/id"
 	"api-mock-system/internal/middleware"
 	"api-mock-system/internal/models"
+	"api-mock-system/internal/pathmatch"
 
 	"github.com/gin-gonic/gin"
 )
@@ -87,7 +88,9 @@ func (h *Handler) Delete(c *gin.Context) {
 func (h *Handler) Serve(c *gin.Context) {
 	uid := mustUserID(c)
 	projectID := c.Param("projectId")
-	path := c.Param("path")
+	// Normalize the inbound path so "/agg" and "/agg/" resolve to the same
+	// aggregate definition — the storage and lookup sides apply the same rule.
+	path := pathmatch.Normalize(c.Param("path"))
 	body, _ := io.ReadAll(c.Request.Body)
 
 	// Build the inbound map from the request. The aggregator's conditional mode
@@ -142,6 +145,8 @@ func (h *Handler) recordCall(projectID, aggID, method, path string, status, dura
 // emit, so the call-log records the same status the client saw.
 func statusForAggrErr(err error) int {
 	switch {
+	case errors.Is(err, aggregateservice.ErrConflict):
+		return http.StatusConflict
 	case errors.Is(err, aggregateservice.ErrNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, aggregateservice.ErrInvalidMode):
@@ -174,6 +179,8 @@ func atoiDefault(s string, def int) int {
 
 func writeErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, aggregateservice.ErrConflict):
+		httpx.Error(c, http.StatusConflict, err.Error())
 	case errors.Is(err, aggregateservice.ErrNotFound):
 		httpx.Error(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, aggregateservice.ErrInvalidMode):

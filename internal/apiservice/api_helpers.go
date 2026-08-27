@@ -2,9 +2,9 @@ package apiservice
 
 import (
 	"errors"
-	"strings"
 
 	"api-mock-system/internal/apirepo"
+	"api-mock-system/internal/pathmatch"
 )
 
 func normalizeMethod(m string) string {
@@ -15,18 +15,11 @@ func normalizeMethod(m string) string {
 	return ""
 }
 
+// normalizePath canonicalizes a path for storage, dedup, and matching. It is a
+// thin wrapper over pathmatch.Normalize so every layer applies the exact same
+// rule — see that function for the shape contract (no trailing slash, root "/").
 func normalizePath(p string) string {
-	if p == "" {
-		return "/"
-	}
-	if p[0] != '/' {
-		p = "/" + p
-	}
-	if len(p) > 1 {
-		p = strings.TrimRight(p, "/")
-		p += "/"
-	}
-	return p
+	return pathmatch.Normalize(p)
 }
 
 func validStatus(s string) bool {
