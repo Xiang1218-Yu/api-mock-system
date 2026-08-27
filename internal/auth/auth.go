@@ -36,14 +36,12 @@ type Claims struct {
 }
 
 // Issue signs a token for the given user valid for the configured expiry.
+// The user id is the token subject and is also carried in the uid claim so
+// downstream code can resolve the account without an extra DB hit.
 func (a *Auth) Issue(userID, email string) (string, error) {
 	now := time.Now()
-	subject := ""
-	if userID != "" {
-		subject = ""
-	}
 	claims := Claims{
-		UserID: subject,
+		UserID: userID,
 		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,

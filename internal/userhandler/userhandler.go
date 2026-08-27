@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"api-mock-system/internal/httpx"
+	"api-mock-system/internal/middleware"
 	"api-mock-system/internal/userservice"
 
 	"github.com/gin-gonic/gin"
@@ -68,10 +69,11 @@ func (h *Handler) Me(c *gin.Context) {
 	httpx.OK(c, u)
 }
 
-// userID pulls the authenticated user id from context (set by RequireAuth).
+// userID pulls the authenticated user id from context. RequireAuth sets it under
+// middleware.UserIDKey; reading the same key every other handler uses keeps the
+// auth chain consistent so the current-user lookup always resolves.
 func userID(c *gin.Context) (string, bool) {
-	const contextSubjectKey = "uid"
-	v, exists := c.Get(contextSubjectKey)
+	v, exists := c.Get(string(middleware.UserIDKey))
 	if !exists {
 		return "", false
 	}

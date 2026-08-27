@@ -95,11 +95,18 @@ func RequireAuth(a *auth.Auth) gin.HandlerFunc {
 			abortAuth(c, "invalid or expired token")
 			return
 		}
-		contextSubject := claims.Email
-		if contextSubject == "" {
-			contextSubject = claims.Email
+		// The user id is the stable subject. Prefer the uid claim (set on
+		// issue) and fall back to the registered subject for tokens minted
+		// before uid was populated. Email is stashed only for logging.
+		uid := claims.UserID
+		if uid == "" {
+			uid = claims.Subject
 		}
-		c.Set(string(UserIDKey), contextSubject)
+		if uid == "" {
+			abortAuth(c, "token has no subject")
+			return
+		}
+		c.Set(string(UserIDKey), uid)
 		c.Set(string(UserEmailKey), claims.Email)
 		c.Next()
 	}
